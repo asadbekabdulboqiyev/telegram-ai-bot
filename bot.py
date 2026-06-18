@@ -287,8 +287,7 @@ async def music(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     if not context.args:
         await update.message.reply_text(
             "🎵 Qo'shiq nomini yozing!\n\n"
-            "Misol: `/music Shape of You`",
-            parse_mode="Markdown",
+            "Misol: /music Shape of You"
         )
         return
 
@@ -297,12 +296,12 @@ async def music(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     youtube_url = f"https://www.youtube.com/results?search_query={encoded_query}"
 
     response_text = (
-        f"🎵 *Qo'shiq topildi!*\n\n"
-        f"🔍 Qidiruv: *{query}*\n\n"
-        f"▶️ [YouTube da tinglash]({youtube_url})\n\n"
+        f"🎵 Qo'shiq topildi!\n\n"
+        f"🔍 Qidiruv: {query}\n\n"
+        f"▶️ YouTube da tinglash:\n{youtube_url}\n\n"
         f"💡 Maslahat: Qo'shiq nomini to'liq yozing — artist + qo'shiq nomi"
     )
-    await update.message.reply_text(response_text, parse_mode="Markdown", disable_web_page_preview=True)
+    await update.message.reply_text(response_text)
 
 
 async def post_init(application) -> None:
