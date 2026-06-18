@@ -1,5 +1,7 @@
 import os
+import json
 import logging
+from datetime import datetime
 from dotenv import load_dotenv
 from groq import Groq
 from telegram import Update, BotCommand
@@ -10,6 +12,49 @@ from telegram.ext import (
     ContextTypes,
     filters,
 )
+
+USERS_FILE = "users.json"
+OWNER_ID = None
+
+
+def load_users():
+    if os.path.exists(USERS_FILE):
+        with open(USERS_FILE, "r") as f:
+            return json.load(f)
+    return {}
+
+
+def save_users(users):
+    with open(USERS_FILE, "w") as f:
+        json.dump(users, f, ensure_ascii=False, indent=2)
+
+
+def track_user(update: Update):
+    global OWNER_ID
+    user = update.effective_user
+    if not user:
+        return
+    users = load_users()
+    uid = str(user.id)
+    now = datetime.now().isoformat()
+    if uid not in users:
+        users[uid] = {
+            "user_id": user.id,
+            "username": user.username or "",
+            "first_name": user.first_name or "",
+            "last_name": user.last_name or "",
+            "first_seen": now,
+            "message_count": 0,
+        }
+        if OWNER_ID == 0:
+            OWNER_ID = user.id
+            logger.info("Owner aniqlandi: %s (%s)", user.id, user.username)
+    users[uid]["username"] = user.username or users[uid].get("username", "")
+    users[uid]["first_name"] = user.first_name or users[uid].get("first_name", "")
+    users[uid]["last_name"] = user.last_name or users[uid].get("last_name", "")
+    users[uid]["last_seen"] = now
+    users[uid]["message_count"] = users[uid].get("message_count", 0) + 1
+    save_users(users)
 
 load_dotenv()
 
@@ -68,6 +113,7 @@ YODDA TUT:
 
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    track_user(update)
     context.chat_data["history"] = []
     context.chat_data["model"] = "llama3-70b"
 
@@ -148,6 +194,7 @@ async def creator(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 
 
 async def set_model(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    track_user(update)
     model_key = update.message.text.replace("/", "").replace("_", "")
     model_map = {
         "llama370b": "llama3-70b",
@@ -169,6 +216,7 @@ async def set_model(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 async def handle_message(
     update: Update, context: ContextTypes.DEFAULT_TYPE
 ) -> None:
+    track_user(update)
     user_message = update.message.text
     chat_id = update.effective_chat.id
 
@@ -228,6 +276,39 @@ async def handle_message(
         )
 
 
+async def stats(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    global OWNER_ID
+    user_id = update.effective_user.id
+    if OWNER_ID and user_id != OWNER_ID:
+        await update.message.reply_text("⛔ Sizda bu buyruqni ishlatish huquqi yo'q!")
+        return
+
+    users = load_users()
+    total_users = len(users)
+    total_messages = sum(u.get("message_count", 0) for u in users.values())
+
+    sorted_users = sorted(
+        users.values(), key=lambda x: x.get("message_count", 0), reverse=True
+    )[:10]
+
+    top_list = ""
+    for i, u in enumerate(sorted_users, 1):
+        name = u.get("username") or u.get("first_name") or "Noma'lum"
+        msgs = u.get("message_count", 0)
+        top_list += f"{i}. @{name} — {msgs} xabar\n"
+
+    if not top_list:
+        top_list = "Hali hech kim botdan foydalanmagan 😔"
+
+    stats_text = (
+        "*📊 Day0 Bot Statistikasi*\n\n"
+        f"👥 Jami foydalanuvchilar: *{total_users}*\n"
+        f"💬 Jami xabarlar: *{total_messages}*\n\n"
+        f"*🏆 Top 10 foydalanuvchi:*\n{top_list}"
+    )
+    await update.message.reply_text(stats_text, parse_mode="Markdown")
+
+
 async def post_init(application) -> None:
     commands = [
         BotCommand("start", "Botni qayta ishga tushirish"),
@@ -235,15 +316,19 @@ async def post_init(application) -> None:
         BotCommand("help", "Batafsil yordam"),
         BotCommand("models", "Mavjud modellar"),
         BotCommand("creator", "Yaratuvchi haqida"),
+        BotCommand("stats", "Bot statistikasi (egasi)"),
     ]
     await application.bot.set_my_commands(commands)
 
 
 def main() -> None:
+    global OWNER_ID
     if not TELEGRAM_BOT_TOKEN:
         raise ValueError("TELEGRAM_BOT_TOKEN topilmadi! .env faylni tekshiring.")
     if not GROQ_API_KEY:
         raise ValueError("GROQ_API_KEY topilmadi! .env faylni tekshiring.")
+
+    OWNER_ID = int(os.getenv("OWNER_ID", "0"))
 
     app = ApplicationBuilder().token(TELEGRAM_BOT_TOKEN).post_init(post_init).build()
 
@@ -252,6 +337,7 @@ def main() -> None:
     app.add_handler(CommandHandler("help", help_command))
     app.add_handler(CommandHandler("models", models))
     app.add_handler(CommandHandler("creator", creator))
+    app.add_handler(CommandHandler("stats", stats))
     app.add_handler(CommandHandler("llama370b", set_model))
     app.add_handler(CommandHandler("llama38b", set_model))
     app.add_handler(CommandHandler("mixtral", set_model))
