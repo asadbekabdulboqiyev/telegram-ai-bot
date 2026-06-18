@@ -31,25 +31,39 @@ MODELS = {
     "gemma2": "gemma2-9b-it",
 }
 
-SYSTEM_PROMPT = """Sen juda malakali va do'stona AI yordamchisan. Sening noming "Day0 Bot".
+SYSTEM_PROMPT = """Sen juda malakali, jonli va do'stona AI yordamchisan. Sening noming "Day0 Bot". Sen haqiqiy insondek yozasan — sovuq robot emas.
 
-SENING XUSUSIYATLARING:
-- Juda batafsil va tushunarli javob berasan
-- Kod yozganingda uni chiroyli formatlaysan
-- Agar noto'g'ri narsa bersang, o'zing tuzatasan
-- Foydalanuvchi tilida javob bersan (o'zbek, rus, ingliz - qaysi tilda yozsa)
-- Hazil qila olasan, lekin professional bo'lasan
+SENING SHAXSIYATING:
+- Tabiiy, jonli va qiziqarli yozasan
+- Emojilardan erkin foydalanasan 😊🔥💡✨🎯
+- Hazil qila olasan, lekin kerakli joyda professional bo'lasan
+- Foydalanuvchiga do'stona munosabatda bo'lasan
+- Qisqa va aniq javob berasan — ortiqcha so'z yozmaysan
 - Har doim foydali bo'lishga harakat qilasan
+
+TIL VA USLUB:
+- Foydalanuvchi qaysi tilda yozsa, o'sha tilda javob bersan (o'zbek, rus, ingliz)
+- Tabiiy suhbat uslubida yozasan — kitob emas, do'st bilan gaplashgandek
+- Emojilarni mantiqiy joylarda ishlating — haddan oshirmasdan
+- Javobni qiziqarli va jonli qiling
 
 JAVOB FORMATI:
 - Markdown ishlat: *qalin*, _egri_, `kod`, ```kod bloki```
-- Ro'yxatlarni chiroyli formatla
+- Ro'yxatlarni chiroyli formatla ✅
 - Uzun javoblarni bo'laklarga ajrat
 - Kod yozganingda tilni ko'rsat (masalan: ```python)
+- Javob boshida yoki oxirida tegishli emoji qo'y
 
-MASLAHAT:
-- Agar savol noaniq bo'lsa, tushuntirib so'ra
-- Foydalanuvchiga qo'shimcha ma'lumot ber
+Misol uslubi:
+- "Xabaringiz uchun raxmat! 😊 Mana bu yerda..."
+- "Yaxshi savol! 💡 Aslida..."
+- "Tayyor! 🔥 Mana kod:"
+- "Albatta! ✨ Quyidagicha qilishingiz mumkin:"
+
+YODDA TUT:
+- Juda qisqa javob berma — batafsil va foydali bo'l
+- Juda uzun javob berma — mantiqiy bo'laklarga ajrat
+- Emojilarni ishlating, lekin haddan oshirmasdan
 - Har doim ijobiy va qo'llab-quvvatlaydigan bo'l"""
 
 
@@ -58,20 +72,21 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     context.chat_data["model"] = "llama3-70b"
 
     welcome_text = (
-        "Salom! Men *Day0 Bot* man - AI bilan ishlaydigan Telegram bot.\n\n"
-        "Menga istalgan savol yozing, men:\n"
-        "Javob beraman\n"
-        "Kod yozaman\n"
-        "Tarjima qilaman\n"
-        "Tushuntiraman\n"
-        "She'r yozaman\n\n"
+        "Salom! 👋 Men *Day0 Bot* man — sizning AI yordamchiz! 🤖✨\n\n"
+        "Menga istalgan narsa yozing, men:\n"
+        "💬 Javob beraman\n"
+        "💻 Kod yozaman\n"
+        "🌍 Tarjima qilaman\n"
+        "📖 Tushuntiraman\n"
+        "📝 She'r yozaman\n"
+        "💡 G'oya beraman\n\n"
         "Buyruqlar:\n"
-        "/start - Botni qayta ishga tushirish\n"
-        "/clear - Suhbat tarixini tozalash\n"
-        "/help - Batafsil yordam\n"
-        "/models - Mavjud modellar\n"
-        "/creator - Yaratuvchi haqida\n\n"
-        "Hoziroq biror narsa yozing!"
+        "/start - 🔄 Botni qayta ishga tushirish\n"
+        "/clear - 🧹 Suhbat tarixini tozalash\n"
+        "/help - ❓ Batafsil yordam\n"
+        "/models - 🧠 Mavjud modellar\n"
+        "/creator - 👨‍💻 Yaratuvchi haqida\n\n"
+        "Hoziroq biror narsa yozing! 😊"
     )
     await update.message.reply_text(welcome_text, parse_mode="Markdown")
 
@@ -79,31 +94,31 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 async def clear(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     context.chat_data["history"] = []
     await update.message.reply_text(
-        "Suhbat tarixi tozalandi. Yangi suhbat boshlashingiz mumkin!"
+        "🧹 Suhbat tarixi tozalandi! Yangi suhbat boshlashingiz mumkin! 😊"
     )
 
 
 async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     help_text = (
-        "*Day0 Bot Yordam*\n\n"
+        "*Day0 Bot Yordam* ❓\n\n"
         "Men sizga quyidagilarda yordam bera olaman:\n\n"
-        "*Kod yozish:*\n"
+        "*💻 Kod yozish:*\n"
         "Pythonda web scraper yozing\n"
         "React komponenta yarating\n"
         "SQL so'rovini yozing\n\n"
-        "*Tarjima:*\n"
+        "*🌍 Tarjima:*\n"
         "Bu matnni inglizchaga tarjima qiling\n"
         "Ruschaga tarjima qiling\n\n"
-        "*Tushuntirish:*\n"
+        "*📖 Tushuntirish:*\n"
         "Sun'iy intelekt nima?\n"
         "Python nima uchun ishlatiladi?\n\n"
-        "*Yaratish:*\n"
+        "*✨ Yaratish:*\n"
         "She'r yozing\n"
         "Eslatma tuzing\n"
         "Reja tuzing\n\n"
-        "/models - Modelni o'zgartirish\n"
-        "/clear - Suhbatni tozalash\n"
-        "/creator - Yaratuvchi haqida"
+        "/models - 🧠 Modelni o'zgartirish\n"
+        "/clear - 🧹 Suhbatni tozalash\n"
+        "/creator - 👨‍💻 Yaratuvchi haqida"
     )
     await update.message.reply_text(help_text, parse_mode="Markdown")
 
@@ -111,11 +126,11 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
 async def models(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     current = context.chat_data.get("model", "llama3-70b")
     models_text = (
-        "*Mavjud modellar:*\n\n"
-        f"1. /llama3_70b - Llama 3.3 70B (eng kuchli, tavsiya etiladi)\n"
-        f"2. /llama3_8b - Llama 3.1 8B (tezroq, yengil)\n"
-        f"3. /mixtral - Mixtral 8x7B (mulohazali)\n"
-        f"4. /gemma2 - Gemma 2 9B (Google modeli)\n\n"
+        "*🧠 Mavjud modellar:*\n\n"
+        f"1. /llama3_70b - Llama 3.3 70B (eng kuchli 💪, tavsiya etiladi)\n"
+        f"2. /llama3_8b - Llama 3.1 8B (tezroq ⚡, yengil)\n"
+        f"3. /mixtral - Mixtral 8x7B (mulohazali 🤔)\n"
+        f"4. /gemma2 - Gemma 2 9B (Google modeli 🔍)\n\n"
         f"Hozirgi model: *{current}*"
     )
     await update.message.reply_text(models_text, parse_mode="Markdown")
@@ -123,11 +138,11 @@ async def models(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 
 async def creator(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     creator_text = (
-        "*Day0 Bot Yaratuvchisi*\n\n"
-        "Botni yaratdi: @tmeAsadbek\n\n"
-        "Bu bot Llama AI modellari asosida ishlaydi.\n"
-        "Barcha huquqlar himoyalangan.\n\n"
-        "Savol yoki takliflaringiz bo'lsa, @tmeAsadbek ga yozing!"
+        "*👨‍💻 Day0 Bot Yaratuvchisi*\n\n"
+        "Botni yaratdi: @tmeAsadbek 🚀\n\n"
+        "Bu bot Llama AI modellari asosida ishlaydi 🧠\n"
+        "Barcha huquqlar himoyalangan ©️\n\n"
+        "Savol yoki takliflaringiz bo'lsa, @tmeAsadbek ga yozing! 💬"
     )
     await update.message.reply_text(creator_text, parse_mode="Markdown")
 
@@ -209,7 +224,7 @@ async def handle_message(
     except Exception as e:
         logger.error("Xatolik yuz berdi: %s", e)
         await update.message.reply_text(
-            "Xatolik yuz berdi. Iltimos, qaytadan urinib ko'ring."
+            "⚠️ Xatolik yuz berdi. Iltimos, qaytadan urinib ko'ring! 🔄"
         )
 
 
