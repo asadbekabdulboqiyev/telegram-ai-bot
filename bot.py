@@ -1,6 +1,7 @@
 import os
 import json
 import logging
+import urllib.parse
 from datetime import datetime
 from dotenv import load_dotenv
 from groq import Groq
@@ -125,12 +126,14 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         "🌍 Tarjima qilaman\n"
         "📖 Tushuntiraman\n"
         "📝 She'r yozaman\n"
+        "🎵 Qo'shiq topaman\n"
         "💡 G'oya beraman\n\n"
         "Buyruqlar:\n"
         "/start - 🔄 Botni qayta ishga tushirish\n"
         "/clear - 🧹 Suhbat tarixini tozalash\n"
         "/help - ❓ Batafsil yordam\n"
         "/models - 🧠 Mavjud modellar\n"
+        "/music - 🎵 Qo'shiq qidirish\n"
         "/creator - 👨‍💻 Yaratuvchi haqida\n\n"
         "Hoziroq biror narsa yozing! 😊"
     )
@@ -158,6 +161,9 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
         "*📖 Tushuntirish:*\n"
         "Sun'iy intelekt nima?\n"
         "Python nima uchun ishlatiladi?\n\n"
+        "*🎵 Qo'shiq:*\n"
+        "/music Shape of You\n"
+        "/music Yalla O'zbekiston\n\n"
         "*✨ Yaratish:*\n"
         "She'r yozing\n"
         "Eslatma tuzing\n"
@@ -276,37 +282,27 @@ async def handle_message(
         )
 
 
-async def stats(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    global OWNER_ID
-    user_id = update.effective_user.id
-    if OWNER_ID and user_id != OWNER_ID:
-        await update.message.reply_text("⛔ Sizda bu buyruqni ishlatish huquqi yo'q!")
+async def music(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    track_user(update)
+    if not context.args:
+        await update.message.reply_text(
+            "🎵 Qo'shiq nomini yozing!\n\n"
+            "Misol: `/music Shape of You`",
+            parse_mode="Markdown",
+        )
         return
 
-    users = load_users()
-    total_users = len(users)
-    total_messages = sum(u.get("message_count", 0) for u in users.values())
+    query = " ".join(context.args)
+    encoded_query = urllib.parse.quote(query)
+    youtube_url = f"https://www.youtube.com/results?search_query={encoded_query}"
 
-    sorted_users = sorted(
-        users.values(), key=lambda x: x.get("message_count", 0), reverse=True
-    )[:10]
-
-    top_list = ""
-    for i, u in enumerate(sorted_users, 1):
-        name = u.get("username") or u.get("first_name") or "Noma'lum"
-        msgs = u.get("message_count", 0)
-        top_list += f"{i}. @{name} — {msgs} xabar\n"
-
-    if not top_list:
-        top_list = "Hali hech kim botdan foydalanmagan 😔"
-
-    stats_text = (
-        "*📊 Day0 Bot Statistikasi*\n\n"
-        f"👥 Jami foydalanuvchilar: *{total_users}*\n"
-        f"💬 Jami xabarlar: *{total_messages}*\n\n"
-        f"*🏆 Top 10 foydalanuvchi:*\n{top_list}"
+    response_text = (
+        f"🎵 *Qo'shiq topildi!*\n\n"
+        f"🔍 Qidiruv: *{query}*\n\n"
+        f"▶️ [YouTube da tinglash]({youtube_url})\n\n"
+        f"💡 Maslahat: Qo'shiq nomini to'liq yozing — artist + qo'shiq nomi"
     )
-    await update.message.reply_text(stats_text, parse_mode="Markdown")
+    await update.message.reply_text(response_text, parse_mode="Markdown", disable_web_page_preview=True)
 
 
 async def post_init(application) -> None:
@@ -316,7 +312,7 @@ async def post_init(application) -> None:
         BotCommand("help", "Batafsil yordam"),
         BotCommand("models", "Mavjud modellar"),
         BotCommand("creator", "Yaratuvchi haqida"),
-        BotCommand("stats", "Bot statistikasi (egasi)"),
+        BotCommand("music", "🎵 Qo'shiq qidirish"),
     ]
     await application.bot.set_my_commands(commands)
 
@@ -337,7 +333,7 @@ def main() -> None:
     app.add_handler(CommandHandler("help", help_command))
     app.add_handler(CommandHandler("models", models))
     app.add_handler(CommandHandler("creator", creator))
-    app.add_handler(CommandHandler("stats", stats))
+    app.add_handler(CommandHandler("music", music))
     app.add_handler(CommandHandler("llama370b", set_model))
     app.add_handler(CommandHandler("llama38b", set_model))
     app.add_handler(CommandHandler("mixtral", set_model))
