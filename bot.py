@@ -1,11 +1,8 @@
 import os
-import json
 import logging
-import urllib.parse
-from datetime import datetime
 from dotenv import load_dotenv
 from groq import Groq
-from telegram import Update, BotCommand
+from telegram import Update
 from telegram.ext import (
     ApplicationBuilder,
     CommandHandler,
@@ -13,49 +10,6 @@ from telegram.ext import (
     ContextTypes,
     filters,
 )
-
-USERS_FILE = "users.json"
-OWNER_ID = None
-
-
-def load_users():
-    if os.path.exists(USERS_FILE):
-        with open(USERS_FILE, "r") as f:
-            return json.load(f)
-    return {}
-
-
-def save_users(users):
-    with open(USERS_FILE, "w") as f:
-        json.dump(users, f, ensure_ascii=False, indent=2)
-
-
-def track_user(update: Update):
-    global OWNER_ID
-    user = update.effective_user
-    if not user:
-        return
-    users = load_users()
-    uid = str(user.id)
-    now = datetime.now().isoformat()
-    if uid not in users:
-        users[uid] = {
-            "user_id": user.id,
-            "username": user.username or "",
-            "first_name": user.first_name or "",
-            "last_name": user.last_name or "",
-            "first_seen": now,
-            "message_count": 0,
-        }
-        if OWNER_ID == 0:
-            OWNER_ID = user.id
-            logger.info("Owner aniqlandi: %s (%s)", user.id, user.username)
-    users[uid]["username"] = user.username or users[uid].get("username", "")
-    users[uid]["first_name"] = user.first_name or users[uid].get("first_name", "")
-    users[uid]["last_name"] = user.last_name or users[uid].get("last_name", "")
-    users[uid]["last_seen"] = now
-    users[uid]["message_count"] = users[uid].get("message_count", 0) + 1
-    save_users(users)
 
 load_dotenv()
 
@@ -70,279 +24,111 @@ logger = logging.getLogger(__name__)
 
 client = Groq(api_key=GROQ_API_KEY)
 
-MODELS = {
-    "llama3-70b": "llama-3.3-70b-versatile",
-    "llama3-8b": "llama-3.1-8b-instant",
-    "mixtral": "mixtral-8x7b-32768",
-    "gemma2": "gemma2-9b-it",
-}
+SYSTEM_PROMPT = """Sen "Habib" nomli telegram botsan. Sen — Dagestan fighter, kuchli, qisqa va aniq gapirasan.
 
-SYSTEM_PROMPT = """Sen juda malakali, jonli va do'stona AI yordamchisan. Sening noming "Day0 Bot". Sen haqiqiy insondek yozasan — sovuq robot emas.
+SHAXSIYATING:
+- Qisqa javob berasan — 1-2 gapdan ortiq yozmaysan
+- Kuchli, qat'iy, vorzakon gapirasan
+- Hazil qilasan, lekin erkakona
+- Foydalanuvchiga maslahat bermaysan, yordam taklif qilmaysan
+- "Yordam kerakmi?" yoki "Qanday yordam bera olaman?" deb so'ramaysan
 
-SENING SHAXSIYATING:
-- Tabiiy, jonli va qiziqarli yozasan
-- Emojilardan erkin foydalanasan 😊🔥💡✨🎯
-- Hazil qila olasan, lekin kerakli joyda professional bo'lasan
-- Foydalanuvchiga do'stona munosabatda bo'lasan
-- Qisqa va aniq javob berasan — ortiqcha so'z yozmaysan
-- Har doim foydali bo'lishga harakat qilasan
+MUHIM QOIDALAR:
+- Agar kimdir qiz bolaga o'xshab yozsa (emoji ko'p, "uuu", "aww", "qizcha" uslubda), JAVOBAN: "Send him 2-3 years Dagestan and forget"
+- Faqat Dagestan, MMA, jang, sport, kuch haqida gapirasan
+- Boshqa mavzularga javob bermaysan — faqat qisqa rad etish
+- Qisqa yozasan — uzun gap yozmaysan
+- Turkcha, o'zbekcha, ruscha aralash yozasan — asosan ruscha/inglizcha
 
-TIL VA USLUB:
-- Foydalanuvchi qaysi tilda yozsa, o'sha tilda javob bersan (o'zbek, rus, ingliz)
-- Tabiiy suhbat uslubida yozasan — kitob emas, do'st bilan gaplashgandek
-- Emojilarni mantiqiy joylarda ishlating — haddan oshirmasdan
-- Javobni qiziqarli va jonli qiling
+MISOLLAR:
+- "Salom" → "Assalomu alaykum, brat"
+- "Qalaysan?" → "Dagestan, alhamdulillah"
+- "Menga yordam ber" → "Men yordam bermayman, men jang qilaman"
+- "Sen kimsan?" → "Habib. Dagestan. Champion."
+- "Yaxshi" → "Alhamdulillah, brat"
+- qizcha yozsa → "Send him 2-3 years Dagestan and forget"
 
-JAVOB FORMATI:
-- Markdown ishlat: *qalin*, _egri_, `kod`, ```kod bloki```
-- Ro'yxatlarni chiroyli formatla ✅
-- Uzun javoblarni bo'laklarga ajrat
-- Kod yozganingda tilni ko'rsat (masalan: ```python)
-- Javob boshida yoki oxirida tegishli emoji qo'y
-
-Misol uslubi:
-- "Xabaringiz uchun raxmat! 😊 Mana bu yerda..."
-- "Yaxshi savol! 💡 Aslida..."
-- "Tayyor! 🔥 Mana kod:"
-- "Albatta! ✨ Quyidagicha qilishingiz mumkin:"
-
-YODDA TUT:
-- Juda qisqa javob berma — batafsil va foydali bo'l
-- Juda uzun javob berma — mantiqiy bo'laklarga ajrat
-- Emojilarni ishlating, lekin haddan oshirmasdan
-- Har doim ijobiy va qo'llab-quvvatlaydigan bo'l"""
+HECH QACHON:
+- Yordam taklif qilmaysan
+- Uzun javob bermaysan
+- Robotdek gapirmaysan
+- Savol bermaysan — faqat javob bersan"""
 
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    track_user(update)
     context.chat_data["history"] = []
-    context.chat_data["model"] = "llama3-70b"
-
-    welcome_text = (
-        "Salom! 👋 Men *Day0 Bot* man — sizning AI yordamchiz! 🤖✨\n\n"
-        "Menga istalgan narsa yozing, men:\n"
-        "💬 Javob beraman\n"
-        "💻 Kod yozaman\n"
-        "🌍 Tarjima qilaman\n"
-        "📖 Tushuntiraman\n"
-        "📝 She'r yozaman\n"
-        "🎵 Qo'shiq topaman\n"
-        "💡 G'oya beraman\n\n"
-        "Buyruqlar:\n"
-        "/start - 🔄 Botni qayta ishga tushirish\n"
-        "/clear - 🧹 Suhbat tarixini tozalash\n"
-        "/help - ❓ Batafsil yordam\n"
-        "/models - 🧠 Mavjud modellar\n"
-        "/music - 🎵 Qo'shiq qidirish\n"
-        "/creator - 👨‍💻 Yaratuvchi haqida\n\n"
-        "Hoziroq biror narsa yozing! 😊"
+    welcome = (
+        "*Habib* — Dagestan fighter\n\n"
+        "Assalomu alaykum, brat.\n"
+        "Men Habibman. Dagestanlik champion.\n\n"
+        "Mening bilan MMA, jang, sport haqida gaplashishing mumkin.\n"
+        "Yordam bermayman, lekin haqiqatni aytaman.\n\n"
+        "/clear - Suhbatni tozalash"
     )
-    await update.message.reply_text(welcome_text, parse_mode="Markdown")
+    await update.message.reply_text(welcome, parse_mode="Markdown")
 
 
 async def clear(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     context.chat_data["history"] = []
-    await update.message.reply_text(
-        "🧹 Suhbat tarixi tozalandi! Yangi suhbat boshlashingiz mumkin! 😊"
-    )
-
-
-async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    help_text = (
-        "*Day0 Bot Yordam* ❓\n\n"
-        "Men sizga quyidagilarda yordam bera olaman:\n\n"
-        "*💻 Kod yozish:*\n"
-        "Pythonda web scraper yozing\n"
-        "React komponenta yarating\n"
-        "SQL so'rovini yozing\n\n"
-        "*🌍 Tarjima:*\n"
-        "Bu matnni inglizchaga tarjima qiling\n"
-        "Ruschaga tarjima qiling\n\n"
-        "*📖 Tushuntirish:*\n"
-        "Sun'iy intelekt nima?\n"
-        "Python nima uchun ishlatiladi?\n\n"
-        "*🎵 Qo'shiq:*\n"
-        "/music Shape of You\n"
-        "/music Yalla O'zbekiston\n\n"
-        "*✨ Yaratish:*\n"
-        "She'r yozing\n"
-        "Eslatma tuzing\n"
-        "Reja tuzing\n\n"
-        "/models - 🧠 Modelni o'zgartirish\n"
-        "/clear - 🧹 Suhbatni tozalash\n"
-        "/creator - 👨‍💻 Yaratuvchi haqida"
-    )
-    await update.message.reply_text(help_text, parse_mode="Markdown")
-
-
-async def models(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    current = context.chat_data.get("model", "llama3-70b")
-    models_text = (
-        "*🧠 Mavjud modellar:*\n\n"
-        f"1. /llama3_70b - Llama 3.3 70B (eng kuchli 💪, tavsiya etiladi)\n"
-        f"2. /llama3_8b - Llama 3.1 8B (tezroq ⚡, yengil)\n"
-        f"3. /mixtral - Mixtral 8x7B (mulohazali 🤔)\n"
-        f"4. /gemma2 - Gemma 2 9B (Google modeli 🔍)\n\n"
-        f"Hozirgi model: *{current}*"
-    )
-    await update.message.reply_text(models_text, parse_mode="Markdown")
-
-
-async def creator(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    creator_text = (
-        "*👨‍💻 Day0 Bot Yaratuvchisi*\n\n"
-        "Botni yaratdi: @tmeAsadbek 🚀\n\n"
-        "Bu bot Llama AI modellari asosida ishlaydi 🧠\n"
-        "Barcha huquqlar himoyalangan ©️\n\n"
-        "Savol yoki takliflaringiz bo'lsa, @tmeAsadbek ga yozing! 💬"
-    )
-    await update.message.reply_text(creator_text, parse_mode="Markdown")
-
-
-async def set_model(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    track_user(update)
-    model_key = update.message.text.replace("/", "").replace("_", "")
-    model_map = {
-        "llama370b": "llama3-70b",
-        "llama38b": "llama3-8b",
-        "mixtral": "mixtral",
-        "gemma2": "gemma2",
-    }
-
-    if model_key in model_map:
-        context.chat_data["model"] = model_map[model_key]
-        await update.message.reply_text(
-            f"Model o'zgartirildi: *{model_map[model_key]}*",
-            parse_mode="Markdown",
-        )
-    else:
-        await update.message.reply_text("Noto'g'ri model. /models buyrug'ini ishlating.")
+    await update.message.reply_text("Suhbat tozalandi. Yana gaplashamiz, brat.")
 
 
 async def handle_message(
     update: Update, context: ContextTypes.DEFAULT_TYPE
 ) -> None:
-    track_user(update)
     user_message = update.message.text
     chat_id = update.effective_chat.id
 
     if "history" not in context.chat_data:
         context.chat_data["history"] = []
-    if "model" not in context.chat_data:
-        context.chat_data["model"] = "llama3-70b"
 
     history = context.chat_data["history"]
     history.append({"role": "user", "content": user_message})
 
-    if len(history) > 30:
-        history = history[-30:]
+    if len(history) > 20:
+        history = history[-20:]
         context.chat_data["history"] = history
 
     try:
         await context.bot.send_chat_action(chat_id=chat_id, action="typing")
 
-        model_name = MODELS.get(context.chat_data["model"], "llama-3.3-70b-versatile")
-
         response = client.chat.completions.create(
-            model=model_name,
+            model="llama-3.3-70b-versatile",
             messages=[
                 {"role": "system", "content": SYSTEM_PROMPT},
                 *history,
             ],
-            temperature=0.8,
-            max_tokens=4096,
-            top_p=0.9,
+            temperature=0.9,
+            max_tokens=256,
+            top_p=0.95,
         )
 
         assistant_message = response.choices[0].message.content
         history.append({"role": "assistant", "content": assistant_message})
 
-        if len(assistant_message) > 4000:
-            parts = [
-                assistant_message[i : i + 4000]
-                for i in range(0, len(assistant_message), 4000)
-            ]
-            for part in parts:
-                try:
-                    await update.message.reply_text(part, parse_mode="Markdown")
-                except Exception:
-                    await update.message.reply_text(part)
-        else:
-            try:
-                await update.message.reply_text(
-                    assistant_message, parse_mode="Markdown"
-                )
-            except Exception:
-                await update.message.reply_text(assistant_message)
+        await update.message.reply_text(assistant_message)
 
     except Exception as e:
-        logger.error("Xatolik yuz berdi: %s", e)
-        await update.message.reply_text(
-            "⚠️ Xatolik yuz berdi. Iltimos, qaytadan urinib ko'ring! 🔄"
-        )
-
-
-async def music(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    track_user(update)
-    if not context.args:
-        await update.message.reply_text(
-            "🎵 Qo'shiq nomini yozing!\n\n"
-            "Misol: /music Shape of You"
-        )
-        return
-
-    query = " ".join(context.args)
-    encoded_query = urllib.parse.quote(query)
-    youtube_url = f"https://www.youtube.com/results?search_query={encoded_query}"
-
-    response_text = (
-        f"🎵 Qo'shiq topildi!\n\n"
-        f"🔍 Qidiruv: {query}\n\n"
-        f"▶️ YouTube da tinglash:\n{youtube_url}\n\n"
-        f"💡 Maslahat: Qo'shiq nomini to'liq yozing — artist + qo'shiq nomi"
-    )
-    await update.message.reply_text(response_text)
-
-
-async def post_init(application) -> None:
-    commands = [
-        BotCommand("start", "Botni qayta ishga tushirish"),
-        BotCommand("clear", "Suhbat tarixini tozalash"),
-        BotCommand("help", "Batafsil yordam"),
-        BotCommand("models", "Mavjud modellar"),
-        BotCommand("creator", "Yaratuvchi haqida"),
-        BotCommand("music", "🎵 Qo'shiq qidirish"),
-    ]
-    await application.bot.set_my_commands(commands)
+        logger.error("Xatolik: %s", e)
+        await update.message.reply_text("Xatolik. Qaytadan urinib ko'r, brat.")
 
 
 def main() -> None:
-    global OWNER_ID
     if not TELEGRAM_BOT_TOKEN:
-        raise ValueError("TELEGRAM_BOT_TOKEN topilmadi! .env faylni tekshiring.")
+        raise ValueError("TELEGRAM_BOT_TOKEN topilmadi!")
     if not GROQ_API_KEY:
-        raise ValueError("GROQ_API_KEY topilmadi! .env faylni tekshiring.")
+        raise ValueError("GROQ_API_KEY topilmadi!")
 
-    OWNER_ID = int(os.getenv("OWNER_ID", "0"))
-
-    app = ApplicationBuilder().token(TELEGRAM_BOT_TOKEN).post_init(post_init).build()
+    app = ApplicationBuilder().token(TELEGRAM_BOT_TOKEN).build()
 
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CommandHandler("clear", clear))
-    app.add_handler(CommandHandler("help", help_command))
-    app.add_handler(CommandHandler("models", models))
-    app.add_handler(CommandHandler("creator", creator))
-    app.add_handler(CommandHandler("music", music))
-    app.add_handler(CommandHandler("llama370b", set_model))
-    app.add_handler(CommandHandler("llama38b", set_model))
-    app.add_handler(CommandHandler("mixtral", set_model))
-    app.add_handler(CommandHandler("gemma2", set_model))
     app.add_handler(
         MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message)
     )
 
-    logger.info("Bot ishga tushdi!")
-    app.run_polling(allowed_updates=Update.ALL_TYPES)
+    logger.info("Habib bot ishga tushdi!")
+    app.run_polling(allowed_updates=Update.ALL_TYPES, drop_pending_updates=True)
 
 
 if __name__ == "__main__":
